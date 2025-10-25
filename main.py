@@ -31,7 +31,7 @@ class KeywordModal(ui.Modal, title="新增或修改關鍵字"):
         self.keyword_input = ui.TextInput(
             label="要偵測的關鍵字或關鍵詞",
             placeholder="輸入關鍵字...",
-            max_length=100,
+            max_length=1000,
             default=key_to_edit if key_to_edit else ""
         )
         self.add_item(self.keyword_input)
@@ -40,7 +40,7 @@ class KeywordModal(ui.Modal, title="新增或修改關鍵字"):
             label="回覆內容",
             placeholder="輸入回覆訊息...",
             style=discord.TextStyle.paragraph,
-            max_length=200,
+            max_length=2000,
             default=keywords.get(key_to_edit, "") if key_to_edit else ""
         )
         self.add_item(self.reply_input)
