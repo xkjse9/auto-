@@ -55,7 +55,7 @@ class KeywordModal(ui.Modal, title="新增或修改關鍵字"):
             keywords.pop(self.key_to_edit, None)
         keywords[key] = reply
         save_keywords()
-        await interaction.response.send_message(f"已儲存關鍵字 `{key}` 對應回覆 `{reply}`", ephemeral=True)
+        await interaction.response.send_message(f"✅ 已儲存關鍵字 `{key}` 對應回覆 `{reply}`", ephemeral=True)
 
 # ---------- 按鈕面板 ----------
 class KeywordView(ui.View):
@@ -91,13 +91,13 @@ async def on_interaction(interaction: Interaction):
         key = custom_id[7:]
         keywords.pop(key, None)
         save_keywords()
-        await interaction.response.send_message(f"已刪除關鍵字 `{key}`", ephemeral=True)
+        await interaction.response.send_message(f"🗑️ 已刪除關鍵字 `{key}`", ephemeral=True)
 
 # ---------- 斜線指令 ----------
 @bot.tree.command(name="keywords", description="開啟關鍵字管理面板")
 async def keywords_command(interaction: Interaction):
     view = KeywordView()
-    await interaction.response.send_message("關鍵字管理面板", view=view, ephemeral=True)
+    await interaction.response.send_message("🔧 關鍵字管理面板", view=view, ephemeral=True)
 
 # ---------- 偵測訊息 ----------
 @bot.event
@@ -110,13 +110,19 @@ async def on_message(message):
             break
     await bot.process_commands(message)
 
+# ---------- 上線事件 ----------
 @bot.event
 async def on_ready():
-    print(f"{bot.user} 上線了")
-    await bot.tree.sync()
+    print(f"✅ {bot.user} 已上線")
+    await bot.change_presence(activity=discord.Game(name="關鍵字監聽中"))
+    try:
+        synced = await bot.tree.sync()
+        print(f"✅ 已同步 {len(synced)} 個斜線指令")
+    except Exception as e:
+        print(f"❌ 同步斜線指令時出錯：{e}")
 
 # ---------- Flask Web 伺服器 ----------
-app = Flask("")
+app = Flask(__name__)
 
 @app.route("/")
 def home():
@@ -126,12 +132,12 @@ def run_web():
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
 
-# 用 daemon 方式啟動 Web Server，避免阻塞 Discord bot
+# 用 daemon 執行 Flask
 threading.Thread(target=run_web, daemon=True).start()
 
-# ---------- 從環境變數讀 Token ----------
+# ---------- 啟動 Bot ----------
 TOKEN = os.environ.get("DISCORD_TOKEN")
 if not TOKEN:
-    print("錯誤：未設定 DISCORD_TOKEN 環境變數！")
+    print("❌ 錯誤：未設定 DISCORD_TOKEN 環境變數！")
 else:
     bot.run(TOKEN)
