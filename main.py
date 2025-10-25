@@ -126,10 +126,12 @@ def run_web():
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
 
-threading.Thread(target=run_web).start()
+# 用 daemon 方式啟動 Web Server，避免阻塞 Discord bot
+threading.Thread(target=run_web, daemon=True).start()
 
 # ---------- 從環境變數讀 Token ----------
-TOKEN = os.environ["DISCORD_TOKEN"]
-bot.run(TOKEN)
-
-
+TOKEN = os.environ.get("DISCORD_TOKEN")
+if not TOKEN:
+    print("錯誤：未設定 DISCORD_TOKEN 環境變數！")
+else:
+    bot.run(TOKEN)
