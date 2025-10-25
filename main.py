@@ -5,6 +5,8 @@ import json
 import os
 from flask import Flask
 import threading
+import requests
+import time
 
 # ---------- Discord Bot ----------
 intents = discord.Intents.default()
@@ -132,8 +134,20 @@ def run_web():
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
 
-# 用 daemon 執行 Flask
+# ---------- 自動 Ping 自己，防止 Render 休眠 ----------
+def ping_self():
+    url = os.environ.get("RENDER_EXTERNAL_URL", "https://hui-fu.onrender.com")
+    while True:
+        try:
+            requests.get(url)
+            print(f"🟢 自動 Ping 成功: {url}")
+        except Exception as e:
+            print(f"🔴 Ping 失敗: {e}")
+        time.sleep(300)  # 每 5 分鐘 ping 一次
+
+# ---------- 啟動多執行緒 ----------
 threading.Thread(target=run_web, daemon=True).start()
+threading.Thread(target=ping_self, daemon=True).start()
 
 # ---------- 啟動 Bot ----------
 TOKEN = os.environ.get("DISCORD_TOKEN")
