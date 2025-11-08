@@ -91,8 +91,16 @@ class KeywordModal(ui.Modal, title="新增或修改關鍵字"):
     def __init__(self, key_to_edit=None):
         super().__init__()
         self.key_to_edit = key_to_edit
-        self.keyword_input = ui.TextInput(label="關鍵字", placeholder="輸入關鍵字...", default=key_to_edit or "")
-        self.reply_input = ui.TextInput(label="回覆內容", style=discord.TextStyle.paragraph, placeholder="輸入回覆訊息...")
+        self.keyword_input = ui.TextInput(
+            label="關鍵字", 
+            placeholder="輸入關鍵字...", 
+            default=key_to_edit or ""
+        )
+        self.reply_input = ui.TextInput(
+            label="回覆內容", 
+            style=discord.TextStyle.paragraph, 
+            placeholder="輸入回覆訊息..."
+        )
         self.add_item(self.keyword_input)
         self.add_item(self.reply_input)
 
@@ -100,17 +108,25 @@ class KeywordModal(ui.Modal, title="新增或修改關鍵字"):
         guild_id = str(interaction.guild_id)
         if guild_id not in keywords:
             keywords[guild_id] = {}
+
         key = self.keyword_input.value.strip()
         reply = self.reply_input.value.strip()
+
         if not key or not reply:
             await interaction.response.send_message("❌ 關鍵字或回覆不能為空", ephemeral=True)
             return
+
+        # 若是修改舊的關鍵字名稱
         if self.key_to_edit and self.key_to_edit != key:
             keywords[guild_id].pop(self.key_to_edit, None)
+
         keywords[guild_id][key] = reply
         save_keywords()
-        await interaction.response.send_message(f"✅ 已儲存關鍵字 `{key}` 對應回覆 `{reply}`", ephemeral=True)
+        await interaction.response.send_message(
+            f"✅ 已儲存關鍵字 `{key}` 對應回覆 `{reply}`", ephemeral=True
+        )
 
+# ====== 按鈕類別 ======
 class DeleteOrEditButton(ui.Button):
     def __init__(self, guild_id, key):
         label = key if len(str(key)) <= 80 else str(key)[:77] + "..."
@@ -120,10 +136,42 @@ class DeleteOrEditButton(ui.Button):
 
     async def callback(self, interaction: Interaction):
         view = ui.View(timeout=None)
-        view.add_item(ui.Button(label="修改", style=discord.ButtonStyle.success, custom_id=f"edit_{self.guild_id}_{self.key}"))
-        view.add_item(ui.Button(label="刪除", style=discord.ButtonStyle.danger, custom_id=f"delete_{self.guild_id}_{self.key}"))
-        await interaction.response.send_message(f"管理關鍵字 `{self.key}`", view=view, ephemeral=True)
 
+        # 修改按鈕
+        class EditButton(ui.Button):
+            def __init__(self, parent):
+                super().__init__(label="修改", style=discord.ButtonStyle.success)
+                self.parent = parent
+
+            async def callback(self, inner_interaction: Interaction):
+                await inner_interaction.response.send_modal(
+                    KeywordModal(key_to_edit=self.parent.key)
+                )
+
+        # 刪除按鈕
+        class DeleteButton(ui.Button):
+            def __init__(self, parent):
+                super().__init__(label="刪除", style=discord.ButtonStyle.danger)
+                self.parent = parent
+
+            async def callback(self, inner_interaction: Interaction):
+                guild_id = self.parent.guild_id
+                key = self.parent.key
+                if guild_id in keywords:
+                    keywords[guild_id].pop(key, None)
+                    save_keywords()
+                await inner_interaction.response.send_message(
+                    f"🗑️ 已刪除關鍵字 `{key}`", ephemeral=True
+                )
+
+        view.add_item(EditButton(self))
+        view.add_item(DeleteButton(self))
+
+        await interaction.response.send_message(
+            f"管理關鍵字 `{self.key}`", view=view, ephemeral=True
+        )
+
+# ====== 關鍵字面板 ======
 class KeywordView(ui.View):
     def __init__(self, guild_id: str):
         super().__init__(timeout=None)
@@ -135,41 +183,30 @@ class KeywordView(ui.View):
     async def add_keyword(self, interaction: Interaction, button: ui.Button):
         await interaction.response.send_modal(KeywordModal())
 
-@bot.event
-async def on_interaction(interaction: Interaction):
-    try:
-        if interaction.type != discord.InteractionType.component:
-            return
-        custom_id = interaction.data.get("custom_id", "")
-        if custom_id.startswith("edit_"):
-            _, guild_id, key = custom_id.split("_", 2)
-            await interaction.response.send_modal(KeywordModal(key_to_edit=key))
-        elif custom_id.startswith("delete_"):
-            _, guild_id, key = custom_id.split("_", 2)
-            if guild_id in keywords:
-                keywords[guild_id].pop(key, None)
-                save_keywords()
-            await interaction.response.send_message(f"🗑️ 已刪除關鍵字 `{key}`", ephemeral=True)
-    except Exception:
-        traceback.print_exc()
-
+# ====== 指令 ======
 @bot.tree.command(name="keywords", description="開啟關鍵字管理面板")
 async def keywords_command(interaction: Interaction):
     guild_id = str(interaction.guild_id)
     view = KeywordView(guild_id)
-    await interaction.response.send_message(f"🔧 關鍵字管理面板（伺服器：{interaction.guild.name}）", view=view, ephemeral=True)
+    await interaction.response.send_message(
+        f"🔧 關鍵字管理面板（伺服器：{interaction.guild.name}）", 
+        view=view, 
+        ephemeral=True
+    )
 
+# ====== 關鍵字觸發 ======
 @bot.event
 async def on_message(message):
     if message.author.bot or not message.guild:
         return
+
     guild_id = str(message.guild.id)
     for key, reply in keywords.get(guild_id, {}).items():
         if key in message.content:
             await message.channel.send(reply)
             break
-    await bot.process_commands(message)
 
+    await bot.process_commands(message)
 
 # ====== 啟動 ======
 if __name__ == "__main__":
